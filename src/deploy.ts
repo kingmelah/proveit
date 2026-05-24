@@ -109,12 +109,12 @@ async function createWallet(seed: string) {
     indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
     provingServerUrl: new URL(CONFIG.proofServer),
     relayURL: new URL(CONFIG.node.replace(/^http/, 'ws')),
-    txHistoryStorage: new InMemoryTransactionHistoryStorage(UnshieldedSectionSchema),
+    txHistoryStorage: new InMemoryTransactionHistoryStorage(UnshieldedSectionSchema as any),
     costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
   };
 
   const wallet = await WalletFacade.init({
-    configuration: walletConfig,
+    configuration: walletConfig as any,
     shielded: async (config) => ShieldedWallet(config).startWithSecretKeys(shieldedSecretKeys),
     unshielded: async (config) => UnshieldedWallet(config).startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore)),
     dust: async (config) => DustWallet(config).startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust),
