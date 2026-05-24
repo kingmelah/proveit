@@ -24,7 +24,9 @@ import { WalletFacade } from '@midnight-ntwrk/wallet-sdk-facade';
 import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { HDWallet, Roles, generateRandomSeed } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
-import { createKeystore, InMemoryTransactionHistoryStorage, PublicKey, UnshieldedWallet } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import { createKeystore, PublicKey, UnshieldedWallet, TransactionHistory } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import { UnshieldedTransactionHistoryEntrySchema } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet/dist/v1/TransactionHistory.js';
+import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 
 // Enable WebSocket for GraphQL subscriptions
@@ -47,21 +49,16 @@ const CONFIG = {
 async function waitForProofServer(maxAttempts = 30, delayMs = 2000): Promise<boolean> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      // Try a simple GET - any response (even 404) means server is up
-      const response = await fetch(CONFIG.proofServer, { 
+      const response = await fetch(CONFIG.proofServer, {
         method: 'GET',
         signal: AbortSignal.timeout(3000),
       });
-      // Any response means the server is running
       return true;
     } catch (err: any) {
-      // Check if it's a connection refused vs other error
       const errMsg = err?.cause?.code || err?.code || '';
       if (errMsg !== 'ECONNREFUSED' && errMsg !== 'UND_ERR_CONNECT_TIMEOUT') {
-        // Got some other error - server might be up but returning errors
         return true;
       }
-      // Server not ready yet
     }
     if (attempt < maxAttempts) {
       process.stdout.write(`\r  Waiting for proof server... (${attempt}/${maxAttempts})   `);
@@ -113,8 +110,7 @@ async function createWallet(seed: string) {
     indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
     provingServerUrl: new URL(CONFIG.proofServer),
     relayURL: new URL(CONFIG.node.replace(/^http/, 'ws')),
-    txHistoryStorage: new InMemoryTransactionHistoryStorage(),
-    costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
+    txHistoryStorage: new InMemoryTransactionHistoryStorage(UnshieldedTransactionHistoryEntrySchema),
   };
 
   const wallet = await WalletFacade.init({
@@ -178,7 +174,6 @@ async function main() {
   const rl = createInterface({ input: stdin, output: stdout });
 
   try {
-    // Check for existing deployment and seed
     let existingSeed: string | undefined;
     let existingContract: string | undefined;
 
@@ -199,7 +194,6 @@ async function main() {
       }
     }
 
-    // If already deployed, ask if they want to redeploy
     if (existingContract) {
       console.log('─── Existing Deployment Found ──────────────────────────────────\n');
       console.log(`  Contract: ${existingContract}`);
@@ -208,7 +202,7 @@ async function main() {
         console.log('\n  Run `npm run cli` to interact with your existing contract.\n');
         return;
       }
-      existingSeed = undefined; // Fresh deployment = fresh wallet
+      existingSeed = undefined;
     }
 
     // 1. Wallet setup
@@ -217,7 +211,6 @@ async function main() {
     let seed: string;
 
     if (existingSeed) {
-      // Resume from previous failed deployment
       console.log('  Found saved seed from previous attempt.');
       const useSaved = await rl.question('  Use saved wallet? [Y/n] ');
       if (useSaved.toLowerCase() !== 'n') {
@@ -273,7 +266,7 @@ async function main() {
     // 2. Fund wallet if needed
     if (balance === 0n) {
       console.log('─── Step 2: Fund Your Wallet ───────────────────────────────────\n');
-      console.log(`  Visit: ${CONFIG.faucetUrl}`);
+      console.log(`  Visit: https://faucet.midnight.network`);
       console.log(`  Address: ${address}\n`);
       console.log('  Waiting for funds...');
 
@@ -315,25 +308,18 @@ async function main() {
     // 4. Deploy contract
     console.log('─── Step 4: Deploy Contract ────────────────────────────────────\n');
 
-    // Check proof server is running
     console.log('  Checking proof server...');
     const proofServerReady = await waitForProofServer();
     if (!proofServerReady) {
       console.log('\n  ❌ Proof server not responding\n');
-      console.log('  The proof server is required to generate zk-proofs for transactions.\n');
       console.log('  ┌─ Start it with ──────────────────────────────────────────────┐');
-      console.log('  │                                                              │');
       console.log('  │  $ docker compose up -d                                      │');
-      console.log('  │                                                              │');
       console.log('  │  Then retry:  $ npm run deploy                               │');
-      console.log('  │                                                              │');
       console.log('  └──────────────────────────────────────────────────────────────┘\n');
 
-      // Save seed for retry
       fs.writeFileSync('.midnight-seed', seed, { mode: 0o600 });
       const partialInfo = { address, network: 'preprod', status: 'proof_server_unavailable' };
       fs.writeFileSync('deployment.json', JSON.stringify(partialInfo, null, 2));
-      console.log('  Wallet saved to .midnight-seed and deployment.json\n');
 
       await walletCtx.wallet.stop();
       process.exit(1);
@@ -346,48 +332,32 @@ async function main() {
     console.log('  Deploying contract...\n');
 
     const MAX_RETRIES = 8;
-    const RETRY_DELAY_MS = 15000; // 15 seconds between retries
+    const RETRY_DELAY_MS = 15000;
 
     let deployed: Awaited<ReturnType<typeof deployContract>> | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-       deployed = await deployContract(providers, {
-        compiledContract: compiledContract as any,
-        args: [],
-      });
-        break; // Success - exit retry loop
+        deployed = await deployContract(providers, {
+          compiledContract: compiledContract as any,
+          args: [],
+        });
+        break;
       } catch (err: any) {
         const errMsg = err?.message || err?.toString() || '';
         const errCause = err?.cause?.message || err?.cause?.toString() || '';
         const fullError = `${errMsg} ${errCause}`;
 
-        // Check for proof server errors first
-        if (fullError.includes('Failed to connect to Proof Server') || 
+        if (fullError.includes('Failed to connect to Proof Server') ||
             fullError.includes('Failed to prove') ||
             fullError.includes('127.0.0.1:6300')) {
           console.log('  ❌ Proof server error\n');
-          console.log('  The proof server may have stopped or crashed.\n');
-          console.log('  ┌─ Fix ────────────────────────────────────────────────────────┐');
-          console.log('  │                                                              │');
-          console.log('  │  1. Check if running:  $ docker ps                           │');
-          console.log('  │  2. Restart:           $ docker compose up -d                │');
-          console.log('  │  3. Retry:             $ npm run deploy                      │');
-          console.log('  │                                                              │');
-          console.log('  └──────────────────────────────────────────────────────────────┘\n');
-
           fs.writeFileSync('.midnight-seed', seed, { mode: 0o600 });
-          const partialInfo = { address, network: 'preprod', status: 'proof_server_error' };
-          fs.writeFileSync('deployment.json', JSON.stringify(partialInfo, null, 2));
-          console.log('  Wallet saved to .midnight-seed and deployment.json\n');
-
           await walletCtx.wallet.stop();
           process.exit(1);
         }
 
-        // Check if it's a DUST-related error (must check "Not enough Dust" specifically)
         if (fullError.includes('Not enough Dust')) {
-          // Get current DUST balance
           const currentState = await walletCtx.wallet.waitForSyncedState();
           const dustBalance = currentState.dust.balance(new Date());
 
@@ -395,46 +365,20 @@ async function main() {
             console.log(`  ⏳ DUST balance: ${dustBalance.toLocaleString()} (need more for tx fees)`);
             console.log(`     Attempt ${attempt}/${MAX_RETRIES} - waiting for DUST to accumulate...`);
 
-            // Countdown display
             for (let i = RETRY_DELAY_MS / 1000; i > 0; i -= 5) {
               process.stdout.write(`\r     Retrying in ${i}s...   `);
               await new Promise((r) => setTimeout(r, 5000));
             }
             process.stdout.write('\r                              \r\n');
           } else {
-            // All retries exhausted
-            console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             console.log('  ❌ Not enough DUST for transaction fees\n');
-            console.log(`     Current DUST: ${dustBalance.toLocaleString()}`);
-            console.log('     This is a new wallet - DUST generates over time.\n');
-            console.log('  ┌─ Options ─────────────────────────────────────────────────┐');
-            console.log('  │                                                           │');
-            console.log('  │  [1] Wait & retry     $ npm run deploy                    │');
-            console.log('  │      (DUST accumulates as blocks are produced)            │');
-            console.log('  │                                                           │');
-            console.log('  │  [2] Send DUST from existing wallet to this address:      │');
-            console.log(`  │      ${address.toString().slice(0, 50)}...  │`);
-            console.log('  │                                                           │');
-            console.log('  │  [3] Import wallet with DUST (choose option 2 on retry)   │');
-            console.log('  │                                                           │');
-            console.log('  └───────────────────────────────────────────────────────────┘\n');
-
-            // Save partial deployment info so user can resume
             fs.writeFileSync('.midnight-seed', seed, { mode: 0o600 });
-            const partialInfo = {
-              address,
-              network: 'preprod',
-              status: 'pending_dust',
-              lastAttempt: new Date().toISOString(),
-            };
+            const partialInfo = { address, network: 'preprod', status: 'pending_dust', lastAttempt: new Date().toISOString() };
             fs.writeFileSync('deployment.json', JSON.stringify(partialInfo, null, 2));
-            console.log('  Wallet saved to .midnight-seed and deployment.json\n');
-
             await walletCtx.wallet.stop();
             process.exit(1);
           }
         } else {
-          // Not a DUST error - rethrow
           throw err;
         }
       }
@@ -448,14 +392,12 @@ async function main() {
     console.log('  ✅ Contract deployed successfully!\n');
     console.log(`  Contract Address: ${contractAddress}\n`);
 
-    // 5. Save deployment info
     fs.writeFileSync('.midnight-seed', seed, { mode: 0o600 });
     const deploymentInfo = {
       contractAddress,
       network: 'preprod',
       deployedAt: new Date().toISOString(),
     };
-
     fs.writeFileSync('deployment.json', JSON.stringify(deploymentInfo, null, 2));
     console.log('  Saved to deployment.json\n');
 
