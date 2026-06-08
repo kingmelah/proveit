@@ -33,13 +33,13 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 globalThis.WebSocket = WebSocket;
 
 // Set network to preprod
-setNetworkId('preprod');
+setNetworkId('undeployed');
 
 // Preprod network configuration
 const CONFIG = {
-  indexer: 'https://indexer.preprod.midnight.network/api/v3/graphql',
-  indexerWS: 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
-  node: 'https://rpc.preprod.midnight.network',
+  indexer: 'http://127.0.0.1:8088/api/v3/graphql',
+  indexerWS: 'ws://127.0.0.1:8088/api/v3/graphql/ws',
+  node: 'http://127.0.0.1:9944',
   proofServer: 'http://127.0.0.1:6300',
 };
 
@@ -285,24 +285,6 @@ async function main() {
     console.log('─── Step 3: DUST Token Setup ───────────────────────────────────\n');
     const dustState = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)));
 
-    if (dustState.dust.balance(new Date()) === 0n) {
-      const nightUtxos = dustState.unshielded.availableCoins.filter((c: any) => !c.meta?.registeredForDustGeneration);
-      if (nightUtxos.length > 0) {
-        console.log('  Registering for DUST generation...');
-        const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
-          nightUtxos,
-          walletCtx.unshieldedKeystore.getPublicKey(),
-          (payload) => walletCtx.unshieldedKeystore.signData(payload),
-        );
-        const signedRecipe = await walletCtx.wallet.signRecipe(recipe, (payload) => walletCtx.unshieldedKeystore.signData(payload));
-        await walletCtx.wallet.submitTransaction(await walletCtx.wallet.finalizeRecipe(signedRecipe));
-      }
-
-      console.log('  Waiting for DUST tokens...');
-      await Rx.firstValueFrom(
-        walletCtx.wallet.state().pipe(Rx.throttleTime(5000), Rx.filter((s) => s.isSynced), Rx.filter((s) => s.dust.balance(new Date()) > 0n)),
-      );
-    }
     console.log('  DUST tokens ready!\n');
 
     // 4. Deploy contract
