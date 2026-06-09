@@ -24,7 +24,7 @@ import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { HDWallet, Roles } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
 import { createKeystore, PublicKey, UnshieldedWallet } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
-import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
+import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 
 // Enable WebSocket for GraphQL subscriptions
@@ -32,13 +32,13 @@ import { CompiledContract } from '@midnight-ntwrk/compact-js';
 globalThis.WebSocket = WebSocket;
 
 // Set network to preprod
-setNetworkId('preprod');
+setNetworkId('undeployed');
 
 // Preprod network configuration
 const CONFIG = {
-  indexer: 'https://indexer.preprod.midnight.network/api/v3/graphql',
-  indexerWS: 'wss://indexer.preprod.midnight.network/api/v3/graphql/ws',
-  node: 'https://rpc.preprod.midnight.network',
+  indexer: 'http://127.0.0.1:8088/api/v3/graphql',
+  indexerWS: 'ws://127.0.0.1:8088/api/v3/graphql/ws',
+  node: 'http://127.0.0.1:9944',
   proofServer: 'http://127.0.0.1:6300',
 };
 
@@ -101,7 +101,7 @@ async function createWallet(seed: string) {
 }
 
 async function createProviders(walletCtx: ReturnType<typeof createWallet> extends Promise<infer T> ? T : never) {
-  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'development';
+  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Dev3lopment_Local!';
 
   const state = await walletCtx.wallet.waitForSyncedState();
 

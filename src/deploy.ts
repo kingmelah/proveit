@@ -24,8 +24,7 @@ import { WalletFacade } from '@midnight-ntwrk/wallet-sdk-facade';
 import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { HDWallet, Roles, generateRandomSeed } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
-import { createKeystore, PublicKey, UnshieldedWallet, UnshieldedSectionSchema } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
-import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
+import { createKeystore, PublicKey, UnshieldedWallet, UnshieldedSectionSchema, InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 
 // Enable WebSocket for GraphQL subscriptions
@@ -109,7 +108,7 @@ async function createWallet(seed: string) {
     indexerClientConnection: { indexerHttpUrl: CONFIG.indexer, indexerWsUrl: CONFIG.indexerWS },
     provingServerUrl: new URL(CONFIG.proofServer),
     relayURL: new URL(CONFIG.node.replace(/^http/, 'ws')),
-    txHistoryStorage: new InMemoryTransactionHistoryStorage(UnshieldedSectionSchema as any),
+    txHistoryStorage: new InMemoryTransactionHistoryStorage(),
     costParameters: { additionalFeeOverhead: 300_000_000_000_000n, feeBlocksMargin: 5 },
   };
 
@@ -126,7 +125,7 @@ async function createWallet(seed: string) {
 }
 
 async function createProviders(walletCtx: ReturnType<typeof createWallet> extends Promise<infer T> ? T : never) {
-  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'development';
+  const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Dev3lopment_Local!';
 
   const state = await walletCtx.wallet.waitForSyncedState();
 
@@ -284,8 +283,36 @@ async function main() {
     // 3. Register for DUST
     console.log('─── Step 3: DUST Token Setup ───────────────────────────────────\n');
     const dustState = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)));
+    const unregisteredUtxos = dustState.unshielded?.availableCoins.filter(
+      (coin: any) => coin.meta.registeredForDustGeneration === false
+    ) ?? [];
 
-    console.log('  DUST tokens ready!\n');
+    if (unregisteredUtxos.length > 0) {
+      console.log(`  Registering ${unregisteredUtxos.length} NIGHT UTXOs for DUST generation...`);
+      const recipe = await walletCtx.wallet.registerNightUtxosForDustGeneration(
+        unregisteredUtxos,
+        walletCtx.unshieldedKeystore.getPublicKey(),
+        (payload: any) => walletCtx.unshieldedKeystore.signData(payload),
+      );
+      const finalizedTx = await walletCtx.wallet.finalizeRecipe(recipe);
+      const txId = await walletCtx.wallet.submitTransaction(finalizedTx);
+      console.log(`  DUST registration submitted: ${txId}`);
+      console.log('  Waiting for DUST to be generated...');
+      await Rx.firstValueFrom(
+        walletCtx.wallet.state().pipe(
+          Rx.throttleTime(5_000),
+          Rx.filter((s: any) => (s.dust?.balance(new Date()) ?? 0n) > 0n),
+        ),
+      );
+      console.log('  ✓ DUST tokens ready!\n');
+    } else {
+      const dustBalance = dustState.dust?.balance(new Date()) ?? 0n;
+      if (dustBalance > 0n) {
+        console.log(`  DUST already registered (balance: ${dustBalance})\n`);
+      } else {
+        console.log('  No unregistered NIGHT UTXOs — skipping.\n');
+      }
+    }
 
     // 4. Deploy contract
     console.log('─── Step 4: Deploy Contract ────────────────────────────────────\n');
