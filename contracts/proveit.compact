@@ -1,5 +1,6 @@
 pragma language_version >= 0.23;
 
+import CompactStandardLibrary;
 // ProveIt - ZK Credential Verification Protocol
 // Chapter 1: Credential Data Structure
 // Author: Midas (@iamkingmelah)
@@ -9,4 +10,11 @@ export ledger threshold: Uint<64>;
 export ledger commitment: Opaque<"string">;
 export ledger verified: Boolean;
 
-
+export circuit commitCredential(
+  balanceCommitment: Opaque<"string">,
+  ownerAddress: Opaque<"string">
+): [] {
+  commitment = disclose(balanceCommitment);
+  owner = disclose(ownerAddress);
+  verified = false;
+}
