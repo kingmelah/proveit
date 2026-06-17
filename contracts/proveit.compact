@@ -1,0 +1,12 @@
+pragma language_version >= 0.23;
+
+// ProveIt - ZK Credential Verification Protocol
+// Chapter 1: Credential Data Structure
+// Author: Midas (@iamkingmelah)
+
+export ledger owner: Opaque<"string">;
+export ledger threshold: Uint<64>;
+export ledger commitment: Opaque<"string">;
+export ledger verified: Boolean;
+
+
