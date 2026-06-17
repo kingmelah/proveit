@@ -36,9 +36,20 @@ export ledger verified: Boolean;             // Final result: true = eligible
 
 export circuit commitCredential(
   balanceCommitment: Opaque<"string">,  // Hash of the private balance
-  ownerAddress: Opaque<"string">        // Wallet address of the prover
+  ownerAddress: Opaque<"string">,       // Wallet address of the prover
+  minimumThreshold: Uint<64>            // Minimum balance required
 ): [] {
   commitment = disclose(balanceCommitment); // Store commitment publicly
   owner = disclose(ownerAddress);           // Store owner address publicly
+  threshold = disclose(minimumThreshold);             // Store threshold publicly
   verified = false;                         // Reset verification on new commit
 }
+
+//============================================================
+// CHAPTER 3: WITNESS 
+// Purpose: Define the private inputs only the prover knows.
+// The witness is NEVER stored on-chain or revealed publicly.
+// It exists only during proof generation then disappears.
+// Think: the secret testimony that validates the sealed envelope.
+// ==========================================================
+witness actualBalance(): Uint<64>;
