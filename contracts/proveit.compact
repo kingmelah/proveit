@@ -22,7 +22,7 @@ import CompactStandardLibrary;
 
 export ledger owner: Opaque<"string">;       // Wallet address of credential holder
 export ledger threshold: Uint<64>;           // Minimum balance required to pass
-export ledger commitment: Opaque<"string">; // Cryptographic hash of private data
+export ledger commitment: Bytes<32>;  // Cryptographic hash of private data
 export ledger verified: Boolean;             // Final result: true = eligible
 
 
@@ -35,16 +35,17 @@ export ledger verified: Boolean;             // Final result: true = eligible
 // ============================================================
 
 export circuit commitCredential(
-  balanceCommitment: Opaque<"string">,  // Hash of the private balance
-  ownerAddress: Opaque<"string">,       // Wallet address of the prover
-  minimumThreshold: Uint<64>            // Minimum balance required
+  rawBalance: Uint<64>,                    // Raw private balance — never disclosed
+  ownerAddress: Opaque<"string">,          // Wallet address of the prover
+  minimumThreshold: Uint<64>              // Minimum balance required
 ): [] {
-  commitment = disclose(balanceCommitment); // Store commitment publicly
-  owner = disclose(ownerAddress);           // Store owner address publicly
-  threshold = disclose(minimumThreshold);             // Store threshold publicly
-  verified = false;                         // Reset verification on new commit
+  // Hash the raw balance inside the ZK circuit
+  // Cannot be faked — hashing happens inside the proof
+  commitment = disclose(persistentHash<Uint<64>>(rawBalance));
+  owner = disclose(ownerAddress);                    // Store owner publicly
+  threshold = disclose(minimumThreshold);            // Store threshold publicly
+  verified = false;                                  // Reset verification state
 }
-
 
 //============================================================
 // CHAPTER 3: WITNESS 
