@@ -1,20 +1,44 @@
 pragma language_version >= 0.23;
 
 import CompactStandardLibrary;
-// ProveIt - ZK Credential Verification Protocol
-// Chapter 1: Credential Data Structure
-// Author: Midas (@iamkingmelah)
 
-export ledger owner: Opaque<"string">;
-export ledger threshold: Uint<64>;
-export ledger commitment: Opaque<"string">;
-export ledger verified: Boolean;
+// ============================================================
+// ProveIt - ZK Credential Verification Protocol
+// Author: Midas (@iamkingmelah)
+// GitHub: github.com/iamkingmelah/proveit
+// ============================================================
+// A privacy-first credential verification protocol on Midnight.
+// Proves eligibility without revealing underlying data.
+// Architecture: Commit → Prove → Verify
+// ============================================================
+
+
+// ============================================================
+// CHAPTER 1: CREDENTIAL DATA STRUCTURE
+// Purpose: Define the on-chain public state of ProveIt.
+// All variables here are visible on the blockchain.
+// The actual private data (balance) never appears here.
+// ============================================================
+
+export ledger owner: Opaque<"string">;       // Wallet address of credential holder
+export ledger threshold: Uint<64>;           // Minimum balance required to pass
+export ledger commitment: Opaque<"string">; // Cryptographic hash of private data
+export ledger verified: Boolean;             // Final result: true = eligible
+
+
+// ============================================================
+// CHAPTER 2: COMMIT CIRCUIT
+// Purpose: Take private credential data and commit it
+// to the blockchain without revealing the underlying values.
+// The user provides a pre-hashed commitment from off-chain.
+// Think: sealing an envelope before handing it over.
+// ============================================================
 
 export circuit commitCredential(
-  balanceCommitment: Opaque<"string">,
-  ownerAddress: Opaque<"string">
+  balanceCommitment: Opaque<"string">,  // Hash of the private balance
+  ownerAddress: Opaque<"string">        // Wallet address of the prover
 ): [] {
-  commitment = disclose(balanceCommitment);
-  owner = disclose(ownerAddress);
-  verified = false;
+  commitment = disclose(balanceCommitment); // Store commitment publicly
+  owner = disclose(ownerAddress);           // Store owner address publicly
+  verified = false;                         // Reset verification on new commit
 }
