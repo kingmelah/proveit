@@ -45,6 +45,7 @@ export circuit commitCredential(
   verified = false;                         // Reset verification on new commit
 }
 
+
 //============================================================
 // CHAPTER 3: WITNESS 
 // Purpose: Define the private inputs only the prover knows.
@@ -53,3 +54,27 @@ export circuit commitCredential(
 // Think: the secret testimony that validates the sealed envelope.
 // ==========================================================
 witness actualBalance(): Uint<64>;
+
+
+// ============================================================
+// CHAPTER 4: PROOF CIRCUIT
+// Purpose: Prove the private balance meets the threshold
+// without revealing the actual balance.
+// This is the zero-knowledge proof — the core of ProveIt.
+// Think: the judge who hears private testimony and delivers
+// a public verdict without revealing what was said.
+// ============================================================
+
+export circuit proveEligibility(): [] {
+  // Retrieve the private balance from the witness
+  // This value NEVER leaves the prover's machine
+  const balance = actualBalance();
+
+  // Compare private balance against public threshold
+  // This comparison is what gets proven cryptographically
+  assert (balance >= threshold,
+    "Balance does not meet the required threshold");
+
+  // If assertion passes — mark as verified publicly
+  verified = true;
+}
