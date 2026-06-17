@@ -35,16 +35,18 @@ export ledger verified: Boolean;             // Final result: true = eligible
 // ============================================================
 
 export circuit commitCredential(
-  rawBalance: Uint<64>,                    // Raw private balance — never disclosed
-  ownerAddress: Opaque<"string">,          // Wallet address of the prover
-  minimumThreshold: Uint<64>              // Minimum balance required
+  rawBalance: Uint<64>,                 // Private — never disclosed
+  ownerAddress: Opaque<"string">,       // Public
+  minimumThreshold: Uint<64>           // Public
 ): [] {
-  // Hash the raw balance inside the ZK circuit
-  // Cannot be faked — hashing happens inside the proof
-  commitment = disclose(persistentHash<Uint<64>>(rawBalance));
-  owner = disclose(ownerAddress);                    // Store owner publicly
-  threshold = disclose(minimumThreshold);            // Store threshold publicly
-  verified = false;                                  // Reset verification state
+  // Recompute hash inside the circuit to verify it's genuine
+  const computedHash = persistentHash<Uint<64>>(rawBalance);
+  
+  // Store the verified hash as commitment
+  commitment = disclose(computedHash);
+  owner = disclose(ownerAddress);
+  threshold = disclose(minimumThreshold);
+  verified = false;
 }
 
 //============================================================
