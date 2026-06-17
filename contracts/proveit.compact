@@ -81,3 +81,20 @@ export circuit proveEligibility(): [] {
   // If assertion passes — mark as verified publicly
   verified = true;
 }
+
+// ============================================================
+// CHAPTER 5: VERIFIER
+// Purpose: Public-facing verification function.
+// This is what other DApps import and call.
+// It reads the public verified state and returns the result.
+// No private data involved — purely public state check.
+// Think: the bouncer who checks the stamp, not the balance.
+// This is what makes ProveIt infrastructure, not just a contract.
+// ============================================================
+
+export circuit verifyCredential(): Boolean {
+  // Return the current verification status
+  // true = credential proven eligible
+  // false = not yet proven or failed
+  return verified;
+}
