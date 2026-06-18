@@ -7,7 +7,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "compile": "compact compile contracts/hello-world.compact contracts/managed/hello-world",
+    "compile": "compact compile contracts/proveit.compact contracts/managed/proveit",
+    "test": "vitest",
     "build": "tsc",
     "deploy": "tsx src/deploy.ts",
     "cli": "tsx src/cli.ts",
@@ -18,7 +19,8 @@
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-js": "^2.5.1",
