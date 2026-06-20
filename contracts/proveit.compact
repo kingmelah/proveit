@@ -75,8 +75,11 @@ export circuit proveEligibility(): [] {
 
   // Compare private balance against public threshold
   // This comparison is what gets proven cryptographically
-  assert (balance >= threshold,
+  assert(balance >= threshold,
     "Balance does not meet the required threshold");
+  
+  assert(balance matches current commitment, 
+    "Proof is stale");
 
   // If assertion passes — mark as verified publicly
   verified = true;
