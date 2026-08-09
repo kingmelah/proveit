@@ -1,88 +1,39 @@
-# hello-world
+# ProveIt
 
-A Midnight Network application created with `create-mn-app`.
+**A privacy-first credential verification protocol on Midnight.**
 
-## Getting Started
+ProveIt lets users prove they meet eligibility criteria — without revealing the underlying data that proves it. Built with Compact on the Midnight Network.
 
-### Prerequisites
+## Architecture
 
-- Node.js 22+ installed
-- Docker installed (for proof server)
+ProveIt follows a **Commit → Prove → Verify** flow:
 
-### Quick Start
+1. **Commit** — A credential is committed on-chain as a cryptographic hash, not the raw data itself.
+2. **Prove** — The holder generates a zero-knowledge proof that their credential satisfies some eligibility condition (e.g. "over 18", "holds valid certification") without revealing the credential's actual contents.
+3. **Verify** — Any party can verify the proof on-chain, confirming eligibility without ever seeing the private data.
 
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+## Circuits
 
-2. **Setup and deploy**:
+| Circuit | Purpose |
+|---|---|
+| `commitCredential` | Commits a hashed credential to the ledger |
+| `proveEligibility` | Generates a ZK proof of eligibility against a committed credential |
+| `verifyCredential` | Verifies a submitted proof on-chain |
 
-   ```bash
-   npm run setup
-   ```
+## Why This Matters
 
-   This will:
+Traditional credential checks require revealing the credential itself — an ID, a certificate, a balance. ProveIt demonstrates that eligibility can be verified with zero data exposure, a core promise of privacy-preserving blockchain infrastructure.
 
-   - Compile your Compact contract
-   - Deploy contract to Preprod
+## Status
 
-3. **Interact with your contract**:
-   ```bash
-   npm run cli
-   ```
+Early-stage proof-of-concept. Currently targeting devnet deployment, with a reference implementation scoped to a single dApp use case (multi-party trust and third-party verifier support planned for v2).
 
-### Available Scripts
+## Tech Stack
 
-- `npm run setup` - Start proof server, compile contract, and deploy
-- `npm run compile` - Compile Compact contract
-- `npm run deploy` - Deploy contract to Preprod
-- `npm run cli` - Interactive CLI for contract
-- `npm run check-balance` - Check wallet balance
-- `npm run proof-server:start` - Start proof server (Docker)
-- `npm run proof-server:stop` - Stop proof server
-- `npm run clean` - Clean build artifacts
+- **Compact** — smart contract language
+- **TypeScript / Node.js** — deployment and client tooling
+- **Midnight Network** — privacy-preserving L1
 
-### Project Structure
+## Author
 
-```
-hello-world/
-├── contracts/
-│   ├── hello-world.compact    # Smart contract source
-│   └── managed/               # Compiled artifacts (after compile)
-├── src/
-│   ├── deploy.ts             # Deployment script
-│   ├── cli.ts                # Interactive CLI
-│   └── check-balance.ts      # Balance checker
-├── docker-compose.yml        # Proof server config
-├── deployment.json           # Deployment info (after deploy)
-└── package.json
-```
-
-### Getting Preprod Tokens
-
-1. Run `npm run deploy` to see your wallet address
-2. Visit [https://faucet.preprod.midnight.network/](https://faucet.preprod.midnight.network/)
-3. Enter your address to receive test tokens (tNight)
-
-### Learn More
-
-- [Midnight Documentation](https://docs.midnight.network)
-- [Compact Language Guide](https://docs.midnight.network/compact)
-- [Tutorial Series](https://docs.midnight.network/tutorials)
-
-## Contract Overview
-
-This project includes a simple "Hello World" contract that:
-
-- Stores a message on the blockchain
-- Allows reading the current message
-- Demonstrates basic Midnight functionality
-
-The contract uses:
-
-- **Public ledger state** for the message
-- **Zero-knowledge proofs** for transactions
-- **Privacy-preserving** architecture
-
-Happy coding! 🌙
+Midas ([@iamkingmelah](https://x.com/iamkingmelah))
