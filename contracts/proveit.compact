@@ -46,7 +46,7 @@ export circuit commitCredential(
   commitment = disclose(computedHash);
   owner = disclose(ownerAddress);
   threshold = disclose(minimumThreshold);
-  verified = false;
+  verified = disclose(false);
 }
 
 //============================================================
@@ -76,13 +76,15 @@ export circuit proveEligibility(): [] {
   // Compare private balance against public threshold
   // This comparison is what gets proven cryptographically
   assert(balance >= threshold,
-    "Balance does not meet the required threshold");
-  
-  assert(balance matches current commitment, 
-    "Proof is stale");
+  "Balance does not meet the required threshold");
 
-  // If assertion passes — mark as verified publicly
-  verified = true;
+  // Recompute hash of private balance and compare to stored commitment
+  // Prevents someone from proving with a different balance than they committed
+  const recomputed = persistentHash<Uint<64>>(balance);
+  assert(recomputed == commitment, "Proof is stale");
+
+  // If both assertions pass — mark as verified publicly
+  verified = disclose(true);
 }
 
 // ============================================================

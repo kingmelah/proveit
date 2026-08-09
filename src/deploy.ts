@@ -24,7 +24,8 @@ import { WalletFacade } from '@midnight-ntwrk/wallet-sdk-facade';
 import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { HDWallet, Roles, generateRandomSeed } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
-import { createKeystore, PublicKey, UnshieldedWallet, UnshieldedSectionSchema, InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import { createKeystore, PublicKey, UnshieldedWallet, UnshieldedSectionSchema } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
+import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';   
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 
 // Enable WebSocket for GraphQL subscriptions
@@ -78,9 +79,9 @@ if (!fs.existsSync(contractPath)) {
   process.exit(1);
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
+const ProveIt = await import(pathToFileURL(contractPath).href);
 
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
+const compiledContract = CompiledContract.make('proveit', ProveIt.Contract).pipe(
   CompiledContract.withVacantWitnesses,
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
@@ -151,7 +152,7 @@ async function createProviders(walletCtx: ReturnType<typeof createWallet> extend
 
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'proveit-state',
       accountId,
       privateStoragePasswordProvider: () => privateStatePassword,
     }),
@@ -167,7 +168,7 @@ async function createProviders(walletCtx: ReturnType<typeof createWallet> extend
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║           Deploy hello-world to Midnight Preprod           ║');
+  console.log('║           Deploy ProveIt to Midnight Local Dev              ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
   const rl = createInterface({ input: stdin, output: stdout });
@@ -198,7 +199,7 @@ async function main() {
       console.log(`  Contract: ${existingContract}`);
       const redeploy = await rl.question('\n  Deploy a new contract? [y/N] ');
       if (redeploy.toLowerCase() !== 'y') {
-        console.log('\n  Run `npm run cli` to interact with your existing contract.\n');
+        console.log('  Next: Run `npm run cli` to interact with ProveIt.\n');
         return;
       }
       existingSeed = undefined;
@@ -404,7 +405,7 @@ async function main() {
     fs.writeFileSync('.midnight-seed', seed, { mode: 0o600 });
     const deploymentInfo = {
       contractAddress,
-      network: 'preprod',
+      network: 'local',
       deployedAt: new Date().toISOString(),
     };
     fs.writeFileSync('deployment.json', JSON.stringify(deploymentInfo, null, 2));
@@ -412,7 +413,7 @@ async function main() {
 
     await walletCtx.wallet.stop();
     console.log('─── Deployment Complete! ───────────────────────────────────────\n');
-    console.log('  Next: Run `npm run cli` to interact with your contract.\n');
+    console.log('  Next: Run `npm run cli` to interact with ProveIt.\n');
   } finally {
     rl.close();
   }
