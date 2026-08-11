@@ -1,5 +1,5 @@
 /**
- * CLI for interacting with hello-world contract
+ * CLI for interacting with the ProveIt contract
  */
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
@@ -7,7 +7,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WebSocket } from 'ws';
-import * as Rx from 'rxjs';
 import { Buffer } from 'buffer';
 
 // Midnight SDK imports
@@ -24,18 +23,14 @@ import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { HDWallet, Roles } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
 import { createKeystore, PublicKey, UnshieldedWallet } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
-import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
-import { TransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
+import { InMemoryTransactionHistoryStorage, TransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
 
-// Enable WebSocket for GraphQL subscriptions
 // @ts-expect-error Required for wallet sync
 globalThis.WebSocket = WebSocket;
 
-// Set network to preprod
 setNetworkId('undeployed');
 
-// Preprod network configuration
 const CONFIG = {
   indexer: 'http://127.0.0.1:8088/api/v3/graphql',
   indexerWS: 'ws://127.0.0.1:8088/api/v3/graphql/ws',
@@ -44,21 +39,28 @@ const CONFIG = {
 };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
-
-// Load compiled contract
+const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'proveit');
 const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
 
-// Check if contract is compiled
 if (!fs.existsSync(contractPath)) {
   console.error('\n❌ Contract not compiled! Run: npm run compile\n');
   process.exit(1);
 }
 
-const HelloWorld = await import(pathToFileURL(contractPath).href);
+const ProveIt = await import(pathToFileURL(contractPath).href);
 
-const compiledContract = CompiledContract.make('hello-world', HelloWorld.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
+// Holds the private balance in memory for the current session.
+// The witness reads from here — this value never gets sent on-chain.
+let sessionBalance: bigint = 0n;
+
+const witnesses = {
+  actualBalance: (context: any): [never, bigint] => {
+    return [context.privateState as never, sessionBalance];
+  },
+};
+
+const compiledContract = CompiledContract.make('proveit', ProveIt.Contract).pipe(
+  CompiledContract.withWitnesses(witnesses),
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
 
@@ -103,7 +105,6 @@ async function createWallet(seed: string) {
 
 async function createProviders(walletCtx: ReturnType<typeof createWallet> extends Promise<infer T> ? T : never) {
   const privateStatePassword = process.env.PRIVATE_STATE_PASSWORD?.trim() || 'Dev3lopment_Local!';
-
   const state = await walletCtx.wallet.waitForSyncedState();
 
   const walletProvider = {
@@ -128,7 +129,7 @@ async function createProviders(walletCtx: ReturnType<typeof createWallet> extend
 
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: 'hello-world-state',
+      privateStateStoreName: 'proveit-state',
       accountId,
       privateStoragePasswordProvider: () => privateStatePassword,
     }),
@@ -144,12 +145,11 @@ async function createProviders(walletCtx: ReturnType<typeof createWallet> extend
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║                   hello-world CLI                           ║');
+  console.log('║                      ProveIt CLI                              ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
 
   const rl = createInterface({ input: stdin, output: stdout });
 
-  // Check for deployment
   if (!fs.existsSync('deployment.json')) {
     console.error('❌ No deployment.json found! Run: npm run deploy\n');
     process.exit(1);
@@ -160,7 +160,6 @@ async function main() {
   console.log(`  Network: ${deployment.network || 'preprod'}\n`);
 
   try {
-    // Create wallet from saved seed
     if (!fs.existsSync('.midnight-seed')) {
       console.error('❌ No .midnight-seed file found! Run: npm run deploy\n');
       process.exit(1);
@@ -171,8 +170,6 @@ async function main() {
     const walletCtx = await createWallet(seed);
 
     console.log('  Syncing with network...');
-    console.log('  ℹ  This may take several minutes depending on network size.');
-    console.log('     RPC disconnection messages during sync are normal and can be safely ignored.\n');
     const syncStart = Date.now();
     const syncInterval = setInterval(() => {
       const elapsed = Math.round((Date.now() - syncStart) / 1000);
@@ -184,7 +181,6 @@ async function main() {
     const balance = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
     console.log(`  Balance: ${balance.toLocaleString()} tNight\n`);
 
-    // Setup providers and connect to contract
     console.log('  Connecting to contract...');
     const providers = await createProviders(walletCtx);
 
@@ -195,24 +191,30 @@ async function main() {
 
     console.log('  ✅ Connected!\n');
 
-    // Interactive CLI loop
     let running = true;
     while (running) {
       console.log('─── Menu ───────────────────────────────────────────────────────');
-      console.log('  1. Store a message');
-      console.log('  2. Read current message');
-      console.log('  3. Check wallet balance');
-      console.log('  4. Exit\n');
+      console.log('  1. Commit a credential (owner address, threshold, private balance)');
+      console.log('  2. Prove eligibility (uses the balance you set in option 1)');
+      console.log('  3. Verify credential (read public verified status)');
+      console.log('  4. Check wallet balance');
+      console.log('  5. Exit\n');
 
       const choice = await rl.question('  Your choice: ');
 
       switch (choice.trim()) {
         case '1': {
-          const message = await rl.question('  Enter your message: ');
-          console.log('\n  Submitting transaction (this may take 30-60 seconds)...');
+          const ownerAddress = await rl.question('  Owner address: ');
+          const thresholdStr = await rl.question('  Minimum threshold: ');
+          const balanceStr = await rl.question('  Private balance (never leaves your machine): ');
+
+          sessionBalance = BigInt(balanceStr.trim());
+          const minimumThreshold = BigInt(thresholdStr.trim());
+
+          console.log('\n  Submitting commitment (this may take 30-60 seconds)...');
           try {
-            const tx = await deployed.callTx.storeMessage(message);
-            console.log(`\n  ✅ Message stored: "${message}"`);
+            const tx = await deployed.callTx.commitCredential(sessionBalance, ownerAddress, minimumThreshold);
+            console.log(`\n  ✅ Credential committed.`);
             console.log(`  Transaction ID: ${tx.public.txId}`);
             console.log(`  Block height: ${tx.public.blockHeight}\n`);
           } catch (error) {
@@ -222,16 +224,15 @@ async function main() {
         }
 
         case '2': {
-          console.log('\n  Reading message from blockchain...');
+          if (sessionBalance === 0n) {
+            console.log('\n  ⚠️  No balance set yet — run option 1 first.\n');
+            break;
+          }
+          console.log('\n  Generating eligibility proof (this may take 30-60 seconds)...');
           try {
-            const contractState = await providers.publicDataProvider.queryContractState(deployment.contractAddress);
-            if (contractState) {
-              const ledgerState = HelloWorld.ledger(contractState.data);
-              const message = Buffer.from(ledgerState.message).toString();
-              console.log(`\n  📋 Current message: "${message}"\n`);
-            } else {
-              console.log('\n  📋 No message found (contract state empty)\n');
-            }
+            const tx = await deployed.callTx.proveEligibility();
+            console.log(`\n  ✅ Eligibility proven.`);
+            console.log(`  Transaction ID: ${tx.public.txId}\n`);
           } catch (error) {
             console.error('\n  ❌ Failed:', error instanceof Error ? error.message : error);
           }
@@ -239,6 +240,22 @@ async function main() {
         }
 
         case '3': {
+          console.log('\n  Reading verified status from blockchain...');
+          try {
+            const contractState = await providers.publicDataProvider.queryContractState(deployment.contractAddress);
+            if (contractState) {
+              const ledgerState = ProveIt.ledger(contractState.data);
+              console.log(`\n  📋 Verified: ${ledgerState.verified}\n`);
+            } else {
+              console.log('\n  📋 No state found (contract state empty)\n');
+            }
+          } catch (error) {
+            console.error('\n  ❌ Failed:', error instanceof Error ? error.message : error);
+          }
+          break;
+        }
+
+        case '4': {
           console.log('\n  Checking balance...');
           const currentState = await walletCtx.wallet.waitForSyncedState();
           const currentBalance = currentState.unshielded.balances[unshieldedToken().raw] ?? 0n;
@@ -248,13 +265,13 @@ async function main() {
           break;
         }
 
-        case '4':
+        case '5':
           running = false;
           console.log('\n  👋 Goodbye!\n');
           break;
 
         default:
-          console.log('\n  ❌ Invalid choice. Please enter 1-4.\n');
+          console.log('\n  ❌ Invalid choice. Please enter 1-5.\n');
       }
     }
 

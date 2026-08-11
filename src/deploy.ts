@@ -1,5 +1,5 @@
 /**
- * Deploy hello-world contract to Midnight Preprod network
+ * Deploy ProveIt contract to Midnight Preprod network
  */
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
@@ -69,7 +69,7 @@ async function waitForProofServer(maxAttempts = 30, delayMs = 2000): Promise<boo
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'hello-world');
+const zkConfigPath = path.resolve(__dirname, '..', 'contracts', 'managed', 'proveit');
 
 // Load compiled contract
 const contractPath = path.join(zkConfigPath, 'contract', 'index.js');
@@ -82,8 +82,14 @@ if (!fs.existsSync(contractPath)) {
 
 const ProveIt = await import(pathToFileURL(contractPath).href);
 
+const witnesses = {
+  actualBalance: (context: any): [never, bigint] => {
+    return [context.privateState as never, 0n];
+  },
+};
+
 const compiledContract = CompiledContract.make('proveit', ProveIt.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
+  CompiledContract.withWitnesses(witnesses),
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
 
