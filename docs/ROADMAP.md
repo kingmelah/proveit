@@ -31,15 +31,6 @@
 
 **Phase 1 is complete.** The full commit → prove → verify cycle has been run end-to-end on a live local devnet, with real transaction IDs confirming each step. Everything that was previously "should work" is now "confirmed working."
 
-**Git commands to save this update:**
-
-```bash
-cd ~/dev/midnight-projects/proveit
-git add docs/ROADMAP.md docs/SECURITY_AUDIT.md
-git commit -m "Phase 1 complete: confirmed live devnet deployment and commit-prove-verify cycle"
-git push
-```
-
 ---
 
 ## Phase 2 — Everyday Proofs of Necessity
