@@ -15,14 +15,30 @@
 | Rebranded from hello-world template (README, package.json, cli.ts, deploy.ts) | ✅ Done |
 | `cli.ts` / `deploy.ts` fixed and type-check clean | ✅ Done |
 | Fixed broken SDK imports (`InMemoryTransactionHistoryStorage` relocation, witness signature mismatch) | ✅ Done |
+| Fixed dependency version conflict (`compact-js` 2.5.1 vs 2.5.0 mismatch across nested SDK packages, switched npm → Yarn to properly respect `resolutions`) | ✅ Done |
 | `npm audit` reviewed and low-risk fix applied | ✅ Done |
 | Mini security audit written (4 findings: fake hash, stale proof, threshold manipulation, proof server compromise) | ✅ Done |
 | Pushed to private GitHub repo (`github.com/kingmelah/proveit`) | ✅ Done |
-| **Actual devnet deployment + live commit → prove → verify test run** | ⬜ Not yet done — next step |
+| **Actual devnet deployment + live commit → prove → verify test run** | ✅ Done |
 
-**Known v1 limitation (see Prerequisite section below):** ledger fields (`owner`, `threshold`, `commitment`, `verified`) are single global values, not scoped per-user. Fine for single-user testing; blocks real multi-dApp composability until fixed.
+**Phase 1 confirmed working — real devnet run, real transactions:**
+- Contract deployed: `f123639fb57f21793fc20253dd23c9904178750d4ce3bed10bcd5f228afdd466`
+- Commit tx: `009d8fbe9bde3e751feac529ebf0939104e23684fb59a91d3091726dfc71b0d802` (balance 5000, threshold 1000)
+- Prove tx: `00c7128c87cb5ef0f4cf7b8fb7df20e6a460af43d0e28021d3f2e5379d4efbfbd5` (eligibility proven, balance never revealed)
+- Verify result: `verified: true` — read independently from the blockchain, confirming the proof holds
 
-**What "Phase 1 complete" actually means:** the devnet test run succeeds — a real commit, a real proof generation, a real on-chain `verified = true`, confirmed by actually calling `verifyCredential()` from the CLI and seeing the correct result. Everything up to now is code that *should* work; the devnet run is what proves it *does*.
+**Known v1 limitation (see Prerequisite section below):** ledger fields (`owner`, `threshold`, `commitment`, `verified`) are single global values, not scoped per-user. Fine for single-user testing (as confirmed above); blocks real multi-dApp composability until fixed.
+
+**Phase 1 is complete.** The full commit → prove → verify cycle has been run end-to-end on a live local devnet, with real transaction IDs confirming each step. Everything that was previously "should work" is now "confirmed working."
+
+**Git commands to save this update:**
+
+```bash
+cd ~/dev/midnight-projects/proveit
+git add docs/ROADMAP.md docs/SECURITY_AUDIT.md
+git commit -m "Phase 1 complete: confirmed live devnet deployment and commit-prove-verify cycle"
+git push
+```
 
 ---
 
@@ -30,7 +46,7 @@
 
 **Theme:** Everyday proofs of necessity — expanding ProveIt from a single threshold-check demo into a library of real-world ZK proof circuits, unified behind one commit → prove → verify architecture.
 
-**Status:** Idea captured, not yet started. Phase 1 must be complete (devnet run confirmed working) before Phase 2 begins.
+**Status:** Idea captured, not yet started. Phase 1 is complete — Phase 2 can begin whenever ready.
 
 ---
 

@@ -355,10 +355,12 @@ async function main() {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
+        console.log('DEBUG compiledContract keys:', Object.getOwnPropertySymbols(compiledContract));
+        console.log('DEBUG compiledContract:', compiledContract);
         deployed = await deployContract(providers, {
-          compiledContract: compiledContract as any,
-          args: [],
-        });
+        compiledContract: compiledContract as any,
+        args: [],
+      });
         break;
       } catch (err: any) {
         const errMsg = err?.message || err?.toString() || '';
