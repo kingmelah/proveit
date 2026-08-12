@@ -1,22 +1,50 @@
-# ProveIt — Book 2 Roadmap
+# ProveIt — Roadmap
+
+---
+
+## Phase 1 — Core Protocol (current)
+
+**Theme:** Prove the commit → prove → verify pattern works, end to end, with a single real-world proof type (balance/threshold eligibility).
+
+**Status as of latest work session:**
+
+| Item | Status |
+|---|---|
+| `commitCredential`, `proveEligibility`, `verifyCredential` circuits written | ✅ Done |
+| Circuits compile clean (k=13, k=13, k=6) | ✅ Done |
+| Rebranded from hello-world template (README, package.json, cli.ts, deploy.ts) | ✅ Done |
+| `cli.ts` / `deploy.ts` fixed and type-check clean | ✅ Done |
+| Fixed broken SDK imports (`InMemoryTransactionHistoryStorage` relocation, witness signature mismatch) | ✅ Done |
+| `npm audit` reviewed and low-risk fix applied | ✅ Done |
+| Mini security audit written (4 findings: fake hash, stale proof, threshold manipulation, proof server compromise) | ✅ Done |
+| Pushed to private GitHub repo (`github.com/kingmelah/proveit`) | ✅ Done |
+| **Actual devnet deployment + live commit → prove → verify test run** | ⬜ Not yet done — next step |
+
+**Known v1 limitation (see Prerequisite section below):** ledger fields (`owner`, `threshold`, `commitment`, `verified`) are single global values, not scoped per-user. Fine for single-user testing; blocks real multi-dApp composability until fixed.
+
+**What "Phase 1 complete" actually means:** the devnet test run succeeds — a real commit, a real proof generation, a real on-chain `verified = true`, confirmed by actually calling `verifyCredential()` from the CLI and seeing the correct result. Everything up to now is code that *should* work; the devnet run is what proves it *does*.
+
+---
+
+## Phase 2 — Everyday Proofs of Necessity
 
 **Theme:** Everyday proofs of necessity — expanding ProveIt from a single threshold-check demo into a library of real-world ZK proof circuits, unified behind one commit → prove → verify architecture.
 
-**Status:** Idea captured, not yet started. Book 1 (core protocol + devnet deployment) must be complete first.
+**Status:** Idea captured, not yet started. Phase 1 must be complete (devnet run confirmed working) before Phase 2 begins.
 
 ---
 
 ## Concept
 
-Book 1 proved the pattern works: one circuit, one condition (balance ≥ threshold), fully private, fully verifiable on-chain.
+Phase 1 proved the pattern works: one circuit, one condition (balance ≥ threshold), fully private, fully verifiable on-chain.
 
-Book 2 keeps the same skeleton — ledger, witness, commit circuit, proof circuit, verifier — and swaps in a new circuit per real-world use case. The goal is a small library of proofs people actually need in daily life, eventually presented behind a single dropdown-style interface: pick a proof type, supply your private input, get a verifiable on-chain result.
+Phase 2 keeps the same skeleton — ledger, witness, commit circuit, proof circuit, verifier — and swaps in a new circuit per real-world use case. The goal is a small library of proofs people actually need in daily life, eventually presented behind a single dropdown-style interface: pick a proof type, supply your private input, get a verifiable on-chain result.
 
 ---
 
 ## Prerequisite: Multi-User Ledger Scoping
 
-Before Book 2 circuits are added, ProveIt's ledger needs to move from single global fields to per-user mappings. Right now, `owner`, `threshold`, `commitment`, and `verified` are single values — a second user committing a credential overwrites the first user's state entirely. This blocks real cross-dApp composability (a lending dApp can't check "is *this specific user* verified" if there's only ever one shared `verified` value).
+Before Phase 2 circuits are added, ProveIt's ledger needs to move from single global fields to per-user mappings. Right now, `owner`, `threshold`, `commitment`, and `verified` are single values — a second user committing a credential overwrites the first user's state entirely. This blocks real cross-dApp composability (a lending dApp can't check "is *this specific user* verified" if there's only ever one shared `verified` value).
 
 **Confirmed correct Compact syntax** (verified against real working Midnight contracts, not just inferred):
 
@@ -45,21 +73,21 @@ verified.insert(disclose(ownerAddress), true);
 
 **README update required once this ships:** the current README line — *"reference implementation scoped to a single dApp use case (multi-party trust and third-party verifier support planned for v2)"* — should change to reflect that multi-user verification is now supported, and the Circuits table description for `verifyCredential` should note it now takes a `userAddress` parameter.
 
-**Timing:** this is a prerequisite for Book 2's circuits to be useful in practice (multiple real users, multiple proof types compounds the single-value overwrite problem), but does not need to be built before Book 1's devnet deployment is tested and confirmed working. Candidate for either a "v1.1 hardening pass" after Book 1 ships, or as the first task inside Book 2 itself.
+**Timing:** this is a prerequisite for Phase 2's circuits to be useful in practice (multiple real users, multiple proof types compounds the single-value overwrite problem), but does not need to be built before Phase 1's devnet deployment is tested and confirmed working. Candidate for either a "v1.1 hardening pass" after Phase 1 ships, or as the first task inside Phase 2 itself.
 
 ---
 
 ## Circuit List (build order: easy → hard)
 
 ### 1. Age Verification
-- **Pattern:** Threshold comparison (near-identical to Book 1's `proveEligibility`)
+- **Pattern:** Threshold comparison (near-identical to Phase 1's `proveEligibility`)
 - **Private witness:** Actual birthdate or age
 - **Public:** Minimum age required
 - **Real-world use:** Alcohol/tobacco delivery, adult content access, gambling platforms
 - **Est. effort:** 2–4 days
 
 ### 2. Income / Solvency Proof
-- **Pattern:** Threshold comparison — reuses Book 1's circuit almost as-is
+- **Pattern:** Threshold comparison — reuses Phase 1's circuit almost as-is
 - **Private witness:** Actual income or asset balance
 - **Public:** Minimum required threshold
 - **Real-world use:** Loan applications, rental applications, visa applications
@@ -73,7 +101,7 @@ verified.insert(disclose(ownerAddress), true);
 - **Est. effort:** 4–7 days
 
 ### 4. Credential / Certification Proof
-- **Pattern:** Hash preimage / commitment matching (extends Book 1's stale-proof check)
+- **Pattern:** Hash preimage / commitment matching (extends Phase 1's stale-proof check)
 - **Private witness:** Underlying credential data
 - **Public:** Commitment hash of the credential
 - **Real-world use:** Job applications, professional licensing checks
@@ -99,7 +127,7 @@ verified.insert(disclose(ownerAddress), true);
 
 - **Full-time-equivalent, back-to-back:** ~6–10 weeks total across all six circuits
 - **Realistic, part-time alongside freelance work + content series:** ~3–5 months
-- **Recommendation:** Do not commit to a fixed deadline yet. Finish Book 1 (devnet deployment + audit report + Post 6) first, then re-scope Book 2 with real velocity data from one complete build cycle.
+- **Recommendation:** Do not commit to a fixed deadline yet. Finish Phase 1 (devnet deployment + audit report + Post 6) first, then re-scope Phase 2 with real velocity data from one complete build cycle.
 
 ---
 
@@ -113,5 +141,5 @@ Each circuit is a natural Compact 101 post — a difficulty ramp from "near-iden
 
 - Confirm Midnight's current documented support for Merkle/set-membership circuits (needed for #5)
 - Confirm Midnight's current documented support for nullifier patterns (needed for #6)
-- Decide whether Book 2 circuits live in the same `proveit` contract/repo, or as separate contracts under a shared ProveIt "protocol" umbrella
-- Revisit per-user scoping question flagged in the Book 1 security audit (`commitment`/`threshold` currently global, not keyed per-owner) — likely needs resolving before Book 2 circuits are added, since multiple proof types per user will compound the issue
+- Decide whether Phase 2 circuits live in the same `proveit` contract/repo, or as separate contracts under a shared ProveIt "protocol" umbrella
+- Revisit per-user scoping question flagged in the Phase 1 security audit (`commitment`/`threshold` currently global, not keyed per-owner) — likely needs resolving before Phase 2 circuits are added, since multiple proof types per user will compound the issue
