@@ -34,6 +34,45 @@ Early-stage proof-of-concept. Currently targeting devnet deployment, with a refe
 - **TypeScript / Node.js** — deployment and client tooling
 - **Midnight Network** — privacy-preserving L1
 
+## Running Locally
+
+ProveIt includes a self-contained local devnet — no external tools required.
+
+**Prerequisites:**
+- Node.js 22+
+- Docker and Docker Compose
+- Yarn (`yarn --version` to check; this project uses Yarn, not npm)
+
+**1. Install dependencies:**
+```bash
+yarn install
+```
+
+**2. Start the local devnet (node, indexer, proof server):**
+```bash
+docker compose up -d
+```
+
+**3. Compile the contract:**
+```bash
+yarn compile
+```
+
+**4. Deploy to your local devnet:**
+```bash
+yarn deploy
+```
+
+**5. Interact with the deployed contract:**
+```bash
+yarn cli
+```
+
+**To stop the devnet:**
+```bash
+docker compose down
+```
+
 ## Author
 
 Midas ([@iamkingmelah](https://x.com/iamkingmelah))
