@@ -31,6 +31,10 @@
 
 **Phase 1 is complete.** The full commit → prove → verify cycle has been run end-to-end on a live local devnet, with real transaction IDs confirming each step. Everything that was previously "should work" is now "confirmed working."
 
+**Post-completion hardening (ongoing):**
+- ✅ ProveIt now ships its own self-contained `docker-compose.yml` (node + indexer + proof server), matching the working reference config from `midnight-local-dev`. No longer depends on a separate tool being cloned elsewhere — `docker compose up -d` inside the ProveIt repo is enough. README updated with full local setup instructions.
+- ⬜ `compact-runtime` version mismatch warning in `resolutions` (pinned to 0.16.0, but `compact-js@2.5.0` actually wants 0.15.0) — not currently blocking, but same class of bug as today's version-conflict debugging; worth resolving properly rather than leaving as a standing warning.
+
 ---
 
 ## Phase 2 — Everyday Proofs of Necessity
