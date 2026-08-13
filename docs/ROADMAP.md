@@ -33,7 +33,7 @@
 
 **Post-completion hardening (ongoing):**
 - ✅ ProveIt now ships its own self-contained `docker-compose.yml` (node + indexer + proof server), matching the working reference config from `midnight-local-dev`. No longer depends on a separate tool being cloned elsewhere — `docker compose up -d` inside the ProveIt repo is enough. README updated with full local setup instructions.
-- ⬜ `compact-runtime` version mismatch warning in `resolutions` (pinned to 0.16.0, but `compact-js@2.5.0` actually wants 0.15.0) — not currently blocking, but same class of bug as today's version-conflict debugging; worth resolving properly rather than leaving as a standing warning.
+- ✅ `compact-runtime` version mismatch resolved — pinned to `0.15.0` in both `dependencies` and `resolutions`, matching what `compact-js@2.5.0` actually declares. Confirmed via `yarn why` (single resolved version, no warning) and re-verified with a clean `tsc --noEmit` and `compact compile`. Investigated upgrading to a newer `compact-js` release instead (which would want `0.16.0`+), but no stable release exists — the only versions requiring newer runtimes are release candidates depending on `ledger-v9` (itself pre-release), so pinning down to the known-working `0.15.0` was the correct, stable choice.
 
 ---
 
