@@ -55,3 +55,4 @@ tmp/
 temp/
 midnight-level-db/
 midnight-level-db/
+standalone.env.example
