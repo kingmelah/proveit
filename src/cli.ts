@@ -52,6 +52,7 @@ const ProveIt = await import(pathToFileURL(contractPath).href);
 // Holds the private balance in memory for the current session.
 // The witness reads from here — this value never gets sent on-chain.
 let sessionBalance: bigint = 0n;
+let sessionOwnerAddress: string = '';
 
 const witnesses = {
   actualBalance: (context: any): [never, bigint] => {
@@ -145,8 +146,8 @@ async function createProviders(walletCtx: ReturnType<typeof createWallet> extend
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║                      ProveIt CLI                              ║');
-  console.log('╚══════════════════════════════════════════════════════════════╝\n');
+  console.log('  ║                      ProveIt CLI                             ║');
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n');
 
   const rl = createInterface({ input: stdin, output: stdout });
 
@@ -209,6 +210,7 @@ async function main() {
           const balanceStr = await rl.question('  Private balance (never leaves your machine): ');
 
           sessionBalance = BigInt(balanceStr.trim());
+          sessionOwnerAddress = ownerAddress.trim();
           const minimumThreshold = BigInt(thresholdStr.trim());
 
           console.log('\n  Submitting commitment (this may take 30-60 seconds)...');
@@ -230,7 +232,7 @@ async function main() {
           }
           console.log('\n  Generating eligibility proof (this may take 30-60 seconds)...');
           try {
-            const tx = await deployed.callTx.proveEligibility();
+            const tx = await deployed.callTx.proveEligibility(sessionOwnerAddress);
             console.log(`\n  ✅ Eligibility proven.`);
             console.log(`  Transaction ID: ${tx.public.txId}\n`);
           } catch (error) {
@@ -240,12 +242,23 @@ async function main() {
         }
 
         case '3': {
+          const addressToCheck = await rl.question('  Address to check (leave blank to use your last committed address): ');
+          const targetAddress = addressToCheck.trim() || sessionOwnerAddress;
+
+          if (!targetAddress) {
+            console.log('\n  ⚠️  No address provided and no address committed this session.\n');
+            break;
+          }
+
           console.log('\n  Reading verified status from blockchain...');
           try {
             const contractState = await providers.publicDataProvider.queryContractState(deployment.contractAddress);
             if (contractState) {
               const ledgerState = ProveIt.ledger(contractState.data);
-              console.log(`\n  📋 Verified: ${ledgerState.verified}\n`);
+              const isVerified = ledgerState.verified.member(targetAddress)
+                ? ledgerState.verified.lookup(targetAddress)
+                : false;
+              console.log(`\n  📋 Verified (${targetAddress}): ${isVerified}\n`);
             } else {
               console.log('\n  📋 No state found (contract state empty)\n');
             }

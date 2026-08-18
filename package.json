@@ -7,14 +7,15 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "compile": "compact compile contracts/proveit.compact contracts/managed/proveit",
-    "test": "vitest",
-    "build": "tsc",
-    "deploy": "tsx src/deploy.ts",
-    "cli": "tsx src/cli.ts",
-    "proof-server:start": "docker compose up -d",
-    "proof-server:stop": "docker compose down"
-  },
+  "compile": "compact compile contracts/proveit.compact contracts/managed/proveit",
+  "test": "vitest",
+  "build": "tsc",
+  "deploy": "tsx src/deploy.ts",
+  "cli": "tsx src/cli.ts",
+  "fund": "tsx src/fund-wallet.ts",
+  "proof-server:start": "docker compose up -d",
+  "proof-server:stop": "docker compose down"
+},
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
@@ -23,8 +24,8 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "@midnight-ntwrk/compact-js": "2.5.0",
-    "@midnight-ntwrk/compact-runtime": "^0.15.0",
+    "@midnight-ntwrk/compact-js": "2.5.1",
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
     "@midnight-ntwrk/ledger-v8": "^8.1.0",
     "@midnight-ntwrk/midnight-js-contracts": "^4.0.4",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.0.4",
@@ -46,8 +47,8 @@
   "resolutions": {
     "@midnight-ntwrk/ledger-v8": "8.1.0",
     "@midnight-ntwrk/midnight-js-network-id": "4.0.4",
-    "@midnight-ntwrk/compact-runtime": "0.15.0",
-    "@midnight-ntwrk/compact-js": "2.5.0"
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/compact-js": "2.5.1"
   },
   "packageManager": "yarn@1.22.22"
 }

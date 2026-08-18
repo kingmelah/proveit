@@ -14,16 +14,21 @@ import CompactStandardLibrary;
 
 
 // ============================================================
-// CHAPTER 1: CREDENTIAL DATA STRUCTURE
+// CHAPTER 1: CREDENTIAL DATA STRUCTURE (Multi-User)
 // Purpose: Define the on-chain public state of ProveIt.
 // All variables here are visible on the blockchain.
 // The actual private data (balance) never appears here.
+//
+// Updated for multi-user support: each field is now a Map
+// keyed by the credential owner's address, so multiple users
+// can commit and verify independently without overwriting
+// each other's state. The owner's address itself becomes the
+// map key — no separate `owner` field is needed anymore.
 // ============================================================
 
-export ledger owner: Opaque<"string">;       // Wallet address of credential holder
-export ledger threshold: Uint<64>;           // Minimum balance required to pass
-export ledger commitment: Bytes<32>;  // Cryptographic hash of private data
-export ledger verified: Boolean;             // Final result: true = eligible
+export ledger thresholds: Map<Opaque<"string">, Uint<64>>;      // Per-user minimum balance required to pass
+export ledger commitments: Map<Opaque<"string">, Bytes<32>>;    // Per-user cryptographic hash of private data
+export ledger verified: Map<Opaque<"string">, Boolean>;         // Per-user final result: true = eligible
 
 
 // ============================================================
@@ -41,12 +46,14 @@ export circuit commitCredential(
 ): [] {
   // Recompute hash inside the circuit to verify it's genuine
   const computedHash = persistentHash<Uint<64>>(rawBalance);
-  
-  // Store the verified hash as commitment
-  commitment = disclose(computedHash);
-  owner = disclose(ownerAddress);
-  threshold = disclose(minimumThreshold);
-  verified = disclose(false);
+
+  // Store per-user data, keyed by owner address.
+  // Re-committing always resets verified to false — this is intentional:
+  // a fresh commitment always requires a fresh proof, so there's never
+  // a stale "verified: true" left over from an outdated credential.
+  commitments.insert(disclose(ownerAddress), disclose(computedHash));
+  thresholds.insert(disclose(ownerAddress), disclose(minimumThreshold));
+  verified.insert(disclose(ownerAddress), disclose(false));
 }
 
 //============================================================
@@ -68,23 +75,20 @@ witness actualBalance(): Uint<64>;
 // a public verdict without revealing what was said.
 // ============================================================
 
-export circuit proveEligibility(): [] {
-  // Retrieve the private balance from the witness
-  // This value NEVER leaves the prover's machine
+export circuit proveEligibility(ownerAddress: Opaque<"string">): [] {
   const balance = actualBalance();
 
-  // Compare private balance against public threshold
-  // This comparison is what gets proven cryptographically
-  assert(balance >= threshold,
+  assert(thresholds.member(disclose(ownerAddress)), "No credential committed for this address");
+
+  const requiredThreshold = thresholds.lookup(disclose(ownerAddress));
+  assert(balance >= requiredThreshold,
   "Balance does not meet the required threshold");
 
-  // Recompute hash of private balance and compare to stored commitment
-  // Prevents someone from proving with a different balance than they committed
   const recomputed = persistentHash<Uint<64>>(balance);
-  assert(recomputed == commitment, "Proof is stale");
+  const storedCommitment = commitments.lookup(disclose(ownerAddress));
+  assert(recomputed == storedCommitment, "Proof is stale");
 
-  // If both assertions pass — mark as verified publicly
-  verified = disclose(true);
+  verified.insert(disclose(ownerAddress), disclose(true));
 }
 
 // ============================================================
@@ -95,11 +99,25 @@ export circuit proveEligibility(): [] {
 // No private data involved — purely public state check.
 // Think: the bouncer who checks the stamp, not the balance.
 // This is what makes ProveIt infrastructure, not just a contract.
+//
+// Updated for multi-user support: now takes an ownerAddress
+// parameter, since verification status is no longer a single
+// global value — each user has their own independent entry.
+// A lending dApp (or any consumer) can now correctly ask
+// "is THIS specific user verified?" instead of only being able
+// to check whichever credential was most recently proven.
+//
+// If the address has never committed a credential at all,
+// this returns false rather than erroring — a safe default
+// for anyone who hasn't interacted with ProveIt yet.
 // ============================================================
 
-export circuit verifyCredential(): Boolean {
-  // Return the current verification status
-  // true = credential proven eligible
-  // false = not yet proven or failed
-  return verified;
+export circuit verifyCredential(ownerAddress: Opaque<"string">): Boolean {
+  // Return this specific user's verification status.
+  // true = this address's credential has been proven eligible
+  // false = not yet proven, failed, or no credential exists for this address
+  if (verified.member(disclose(ownerAddress))) {
+    return disclose(verified.lookup(disclose(ownerAddress)));
+  }
+  return false;
 }
