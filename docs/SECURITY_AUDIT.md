@@ -9,7 +9,7 @@
 
 ## Overview
 
-This report documents four vulnerability classes identified during the design and implementation of ProveIt, a privacy-first credential verification protocol built on Midnight using Compact. Three of these are contract-logic level risks; the fourth is an infrastructure-level trust boundary inherent to the proof-generation process itself.
+This report documents six vulnerability classes and design-property limitations identified during the design and implementation of ProveIt, a privacy-first credential verification protocol built on Midnight using Compact. Three are contract-logic level risks; one is an infrastructure-level trust boundary; two are design-scope limitations inherent to what a self-contained ZK proof can honestly guarantee.
 
 For each finding: description, why it matters, and how ProveIt's current design addresses (or should address) it.
 
@@ -50,7 +50,7 @@ This closes the gap — a proof can only succeed if the balance used matches the
 
 **Mitigation in ProveIt:** `threshold` is set once, at commitment time, inside `commitCredential`, and is not exposed via any circuit that would allow it to be altered afterward. Because `proveEligibility` reads the threshold from the existing public ledger state (not from a fresh argument), a prover cannot supply their own preferred threshold at proof time — it's locked to whatever was committed.
 
-**Open question for further hardening:** the current design assumes a single credential per contract instance (no multi-user namespacing). A production version should consider whether `threshold` and `commitment` need to be scoped per-owner (e.g., keyed by `owner` address) to prevent one user's commitment from overwriting another's.
+**Update — multi-user scoping resolved:** the original open question here (single global `threshold`/`commitment`/`verified` fields, allowing one user's commit to overwrite another's) has been resolved. All three fields are now `Map<Opaque<"string">, ...>` types keyed by owner address, giving each user an independent, non-overwritable entry. Confirmed working via live devnet test: two separate addresses committing and proving independently, with each address's `verified` status remaining correct and unaffected by the other's activity.
 
 ---
 
@@ -68,17 +68,51 @@ This closes the gap — a proof can only succeed if the balance used matches the
 
 ---
 
-## Summary Table
+## 5. Unverified Self-Asserted Data (No Trusted Attestation)
+
+**Risk:** In the current implementation, a user can assert *any* value as their private balance — there is nothing that ties `actualBalance()` to a real, externally verifiable fact. The circuit correctly proves internal consistency ("this number satisfies the threshold, and matches what was committed"), but it has no way to verify the number itself reflects reality.
+
+**Why it matters:** This is a fundamental distinction in what zero-knowledge proofs actually guarantee, and it's important not to overstate ProveIt's current capability. ZK proofs prove that a computation was performed correctly on some claimed input — they do not, on their own, prove that the input is *true*. A user could type in "5,000,000" as their balance with no actual funds behind that number, generate a fully valid proof, and pass eligibility — because the proof only checks "does this claimed number satisfy the threshold," not "does this person actually possess this amount."
+
+**Why ProveIt doesn't currently solve this:** the witness (`actualBalance`) is entirely self-reported, supplied directly by the user's own client code (see `cli.ts`), with no external source of truth involved anywhere in the flow.
+
+**How production ZK identity/credential systems solve this (and what ProveIt should adopt):** the standard pattern is **trusted attestation via digital signature**. Instead of the witness being a raw, user-typed number, it becomes a **signed statement from a trusted issuer** — e.g., a bank, employer, or KYC provider cryptographically signs "this account holds ≥ $X" using a known, public verification key. The circuit then verifies two things instead of one:
+1. The claimed value satisfies the threshold (as it already does)
+2. The claimed value is accompanied by a *valid signature* from a recognized, trusted issuer's public key
+
+Only the second check actually prevents a user from fabricating data — the math alone, without a signature check, cannot distinguish a real claim from an invented one.
+
+**Status:** Not yet implemented. This is a significant, honestly-scoped limitation of the current proof-of-concept, not something to be quietly assumed away. Any production deployment of ProveIt must incorporate a signed-attestation layer before its eligibility proofs can be treated as trustworthy by a relying dApp (e.g., a lender should not treat today's `verified: true` as proof of real solvency — only as proof that a self-reported number satisfied a threshold).
+
+**Architectural direction — a separate attestation protocol ("Classified"):** rather than building signature verification directly into ProveIt, the cleaner design — consistent with ProveIt's own "protocol, not policy" principle (see Section 3, Threshold Manipulation, and the multi-user design notes in the roadmap) — is a dedicated, separate dApp responsible for producing signed, hashed attestations about a user's data (wallet balance, documents, credentials). ProveIt and other verification dApps would then consume those signed hashes as trusted witnesses, rather than raw self-reported values. This keeps ProveIt focused on proving conditions about data, while a separate system is responsible for vouching that the underlying data is real. This concept has been captured as a distinct future project, working name "Classified."
+
+---
+
+## 6. Point-in-Time Proof, Not Sustained-State Proof
+
+**Risk:** `proveEligibility` checks `balance >= threshold` at the exact moment a proof is generated — it is a snapshot check with no concept of time, history, or duration. This means a user could, in principle, temporarily acquire funds sufficient to pass the threshold, generate a valid proof, and immediately move those funds elsewhere afterward. The resulting `verified: true` is entirely genuine and mathematically correct — the balance genuinely met the threshold at that instant — but it says nothing about whether the user holds, or ever meaningfully held, that balance beyond the moment of proving.
+
+**Why it matters:** a relying dApp that treats `verified: true` as evidence of an ongoing or durable financial position (e.g., "this user is creditworthy," "this user meaningfully holds this much capital") would be over-interpreting what the proof actually guarantees. This is a distinct risk from Finding #5: even with a fully trusted, externally-attested balance (solving #5), a snapshot proof is still just a snapshot — attestation solves *is the number real*, not *is the number meaningfully sustained*.
+
+**Whose responsibility this is:** consistent with the "protocol, not policy" principle established elsewhere in this document, ProveIt's job is to honestly prove a condition held at a specific moment — nothing more, nothing less. Whether a single snapshot is sufficient evidence, or whether a decision requires proof sustained across multiple points in time, is a risk-tolerance decision that belongs to the consuming dApp, not to ProveIt itself.
+
+**Recommendation for relying dApps (not a ProveIt-side fix):** applications with meaningful financial or legal stakes should consider requiring multiple independent proofs across separate points in time (e.g., proof of eligibility on several different days) rather than accepting a single proof as sufficient, or pairing ProveIt's proof with their own additional on-chain checks (transaction history, holding-period analysis) outside ProveIt's scope.
+
+**Status:** Not a defect — an inherent, honestly-scoped property of what a single ZK proof can and cannot demonstrate. Documented here so relying dApps do not mistake a point-in-time proof for a durable guarantee.
+
+---
 
 | # | Vulnerability Class | Layer | Status in ProveIt |
 |---|---|---|---|
 | 1 | Fake Hash | Contract logic | Mitigated — hash computed in-circuit |
 | 2 | Stale Proof | Contract logic | Mitigated — commitment re-check enforced |
-| 3 | Threshold Manipulation | Contract logic | Mitigated — threshold immutable post-commit; multi-user scoping is an open question |
+| 3 | Threshold Manipulation | Contract logic | Mitigated — threshold immutable post-commit; multi-user scoping resolved and confirmed live |
 | 4 | Proof Server Compromise | Infrastructure / trust boundary | Documented — local-only proof server recommended; no on-chain correctness risk |
+| 5 | Unverified Self-Asserted Data | Trust model / design | **Open — not yet implemented.** Requires a signed-attestation layer before proofs can be treated as trustworthy in production |
+| 6 | Point-in-Time Proof, Not Sustained-State Proof | Design property, not a defect | Documented — relying dApps should not treat a single proof as a durable guarantee; mitigation (multiple proofs over time) is the consuming dApp's responsibility |
 
 ---
 
 ## Notes
 
-This audit reflects the current single-credential, proof-of-concept scope of ProveIt. As the protocol expands toward multi-party trust and third-party verifier support (v2), each of these findings should be revisited — particularly threshold/commitment scoping (#3) and proof server trust models for a broader user base (#4).
+This audit reflects the current proof-of-concept scope of ProveIt. Multi-user scoping (#3) is now resolved and confirmed working via live devnet test. The most significant remaining gap is #5 — without a trusted attestation/signature layer, ProveIt's current proofs demonstrate correct math on self-reported data, not verified real-world facts. This should be treated as the top priority before any production or relying-party use, ahead of expanding to additional proof types in Phase 2. Finding #6 is not a defect requiring a fix, but an honest scope boundary that relying dApps must design around — a proof demonstrates a condition held at one moment, not that it holds continuously.
